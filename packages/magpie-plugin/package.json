@@ -1,0 +1,41 @@
+{
+  "name": "@magpie-community/plugin-wecom",
+  "version": "1.1.0",
+  "description": "Enterprise WeChat (WeCom) Multi-Bot Manager & Task Sniffer Plugin for Magpie",
+  "type": "module",
+  "magpie": {
+    "page": {
+      "title": "企微 AI 伴侣",
+      "file": "./page/index.html",
+      "icon": "message-square"
+    },
+    "middleware": "./wecom.middleware.js",
+    "options": {
+      "notifyUrl": {
+        "type": "string",
+        "default": "http://127.0.0.1:9099/notify",
+        "description": "wecom-agent-bridge 本地通知与管理服务地址"
+      },
+      "enabled": {
+        "type": "boolean",
+        "default": true,
+        "description": "是否启用企微自动任务完成通知"
+      },
+      "minDurationSec": {
+        "type": "number",
+        "default": 3,
+        "description": "触发通知的最小任务耗时(秒)，过滤极短轻量请求"
+      }
+    }
+  },
+  "keywords": [
+    "magpie",
+    "page",
+    "middleware",
+    "wecom",
+    "multi-bot",
+    "ai-agent",
+    "claude-code"
+  ],
+  "license": "MIT"
+}

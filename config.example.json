@@ -1,0 +1,32 @@
+{
+  "wecom": {
+    "botId": "YOUR_BOT_ID_HERE",
+    "secret": "YOUR_SECRET_HERE",
+    "allowedUsers": [
+      "User1",
+      "User2"
+    ]
+  },
+  "server": {
+    "port": 9099,
+    "host": "127.0.0.1"
+  },
+  "defaultAgent": "claude",
+  "agents": {
+    "claude": {
+      "type": "cli",
+      "command": "claude -p \"{prompt}\"",
+      "description": "Claude Code 终端交互"
+    },
+    "opencode": {
+      "type": "cli",
+      "command": "opencode run \"{prompt}\"",
+      "description": "OpenCode 终端交互"
+    },
+    "sh": {
+      "type": "cli",
+      "command": "{prompt}",
+      "description": "直接执行终端 Shell 命令"
+    }
+  }
+}

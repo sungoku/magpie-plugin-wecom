@@ -1,0 +1,24 @@
+{
+  "name": "wecom-agent-bridge-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Universal Enterprise WeChat Bridge for AI Coding Agents",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "start": "pnpm --filter @wecom-agent-bridge/core start",
+    "dev": "pnpm --filter @wecom-agent-bridge/core dev",
+    "build": "pnpm --filter @wecom-agent-bridge/core build"
+  },
+  "keywords": [
+    "wecom",
+    "ai-agent",
+    "claude-code",
+    "opencode",
+    "magpie",
+    "coding-agent"
+  ],
+  "author": "",
+  "license": "MIT"
+}
