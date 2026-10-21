@@ -1,23 +1,48 @@
 {
-  "name": "wecom-agent-bridge-monorepo",
-  "version": "1.0.0",
-  "private": true,
-  "description": "Universal Enterprise WeChat Bridge for AI Coding Agents",
-  "workspaces": [
-    "packages/*"
-  ],
+  "name": "@magpie-community/plugin-wecom",
+  "version": "1.1.0",
+  "description": "Enterprise WeChat (WeCom) Multi-Bot Manager & Task Sniffer Plugin for Magpie, Claude Code, and OpenCode",
+  "type": "module",
+  "magpie": {
+    "page": {
+      "title": "企微 AI 伴侣",
+      "file": "./packages/magpie-plugin/page/index.html",
+      "icon": "message-square"
+    },
+    "middleware": "./packages/magpie-plugin/wecom.middleware.js",
+    "options": {
+      "notifyUrl": {
+        "type": "string",
+        "default": "http://127.0.0.1:9099/notify",
+        "description": "wecom-agent-bridge 本地通知与管理服务地址"
+      },
+      "enabled": {
+        "type": "boolean",
+        "default": true,
+        "description": "是否启用企微自动任务完成通知"
+      },
+      "minDurationSec": {
+        "type": "number",
+        "default": 3,
+        "description": "触发通知的最小任务耗时(秒)，过滤极短轻量请求"
+      }
+    }
+  },
   "scripts": {
-    "start": "pnpm --filter @wecom-agent-bridge/core start",
-    "dev": "pnpm --filter @wecom-agent-bridge/core dev",
-    "build": "pnpm --filter @wecom-agent-bridge/core build"
+    "start": "node packages/core/dist/index.js",
+    "dev": "npx tsx packages/core/src/index.ts",
+    "build": "cd packages/core && npx tsc"
   },
   "keywords": [
+    "magpie",
+    "magpie-plugin",
+    "magpie-community",
     "wecom",
+    "wechat-work",
+    "multi-bot",
     "ai-agent",
     "claude-code",
-    "opencode",
-    "magpie",
-    "coding-agent"
+    "opencode"
   ],
   "author": "",
   "license": "MIT"
