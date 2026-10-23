@@ -1,16 +1,18 @@
 {
   "name": "@wecom-agent-bridge/core",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Universal Enterprise WeChat Multi-Bot Core Engine for AI Coding Agents",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "wecom-bridge": "bin/cli.js"
+    "wecom-bridge": "dist/cli.js"
   },
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "start": "tsx src/index.ts",
-    "build": "tsc"
+    "dev": "tsx watch src/cli.ts",
+    "start": "tsx src/cli.ts",
+    "build": "tsc",
+    "prepack": "npm run build",
+    "test": "npm run build && tsx --test test/*.test.ts"
   },
   "dependencies": {
     "@wecom/aibot-node-sdk": "^1.0.0",

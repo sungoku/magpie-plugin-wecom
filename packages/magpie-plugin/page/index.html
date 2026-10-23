@@ -1,284 +1,126 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>企微 AI 伴侣管理 - WeCom Agent Bridge</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    body {
-      background-color: #0f172a;
-      color: #e2e8f0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    }
-    input, select, textarea {
-      background-color: #1e293b !important;
-      border-color: #334155 !important;
-      color: #f8fafc !important;
-    }
-    input:focus, select:focus, textarea:focus {
-      border-color: #38bdf8 !important;
-      outline: none;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>企微 AI 伴侣</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
 </head>
-<body class="p-6 max-w-4xl mx-auto">
-  <!-- 头部与状态栏 -->
-  <div class="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-slate-800 gap-4">
-    <div>
-      <div class="flex items-center gap-3">
-        <span class="text-2xl">🤖</span>
-        <h1 class="text-xl font-bold text-white">企业微信 AI 伴侣 (WeCom Agent Bridge)</h1>
-        <span id="service-status" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-950 text-emerald-400 border border-emerald-800">
-          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          服务就绪
-        </span>
-      </div>
-      <p class="text-xs text-slate-400 mt-1">支持多 Bot 角色隔离、官方 WSS 长连接无感通信，专为 Coding Agent 设计</p>
-    </div>
+<body data-mode="loading">
 
-    <!-- 快捷启停控制 -->
-    <div class="flex items-center gap-2">
-      <button id="btn-toggle-service" onclick="toggleService()" class="px-3 py-1.5 text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors shadow">
-        重启服务
-      </button>
-      <button onclick="saveAndApply()" class="px-3 py-1.5 text-xs font-medium bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors shadow">
-        保存并应用
-      </button>
+<header class="header">
+  <div class="header-text">
+    <h1>企微 AI 伴侣</h1>
+    <p id="subtitle">企业微信多 Bot 网关与任务完成通知</p>
+  </div>
+  <div class="header-actions" id="header-actions" hidden>
+    <span id="status-badge" class="badge badge-idle"><span class="dot"></span><span id="status-text">检测中</span></span>
+    <button id="btn-toggle" class="btn" type="button">启动服务</button>
+    <button id="btn-save" class="btn btn-primary" type="button">保存并应用</button>
+  </div>
+</header>
+
+<!-- ======================= Magpie 内嵌模式 ======================= -->
+<section id="magpie-panel" class="panel" hidden>
+  <div class="notice">
+    <strong>Magpie 安全沙箱说明：</strong>
+    插件页运行在 <code>sandbox="allow-scripts"</code> 的框架中，策略禁止任何网络请求
+    （<code>connect-src 'none'</code>），因此本页无法直接连接本机管理服务，也无法运行内联脚本。
+    任务完成通知的开关在下方配置；Bot 凭证与角色管理请点击“打开管理界面”，由本地服务
+    <code>127.0.0.1:9099</code> 提供完整管理页。
+  </div>
+
+  <div class="card">
+    <h2>企微通知</h2>
+    <p class="muted">由 Magpie 异步网关钩子在每轮 Agent 请求结束后推送；Claude Code 的内部搜索/建议侧调用会被跳过，带客户端工具调用的中间回复不会推送。工具调用后若长时间没有下一步请求，会推送“等待确认/选择”提醒。</p>
+    <div class="form-grid">
+      <label class="check-row full">
+        <input id="mg-enabled" type="checkbox" checked>
+        <span>启用企微通知（任务完成与等待确认）</span>
+      </label>
+      <label class="field">
+        <span>最小触发耗时（秒）</span>
+        <input id="mg-min-duration" type="number" min="0" max="3600" step="1" value="3">
+      </label>
+      <label class="field">
+        <span>等待确认提醒（秒，0 关闭）</span>
+        <input id="mg-approval-wait" type="number" min="0" max="300" step="1" value="10">
+      </label>
+      <label class="field full">
+        <span>通知服务地址</span>
+        <input id="mg-notify-url" type="text" spellcheck="false" value="http://127.0.0.1:9099/notify">
+      </label>
+      <label class="check-row full">
+        <input id="mg-autostart" type="checkbox">
+        <span>网关未运行时自动启动本地服务</span>
+      </label>
+      <p class="muted small full">
+        由 Magpie 插件宿主在本机启动网关（需本仓库已安装依赖；建议先执行 <code>npm run build</code>）。
+        服务会脱离 Magpie 继续运行；取消勾选不会停止已在运行的服务。
+      </p>
+    </div>
+    <div class="row">
+      <button id="mg-save" class="btn btn-primary" type="button">保存设置</button>
+      <span id="mg-status" class="status-inline" role="status"></span>
     </div>
   </div>
 
-  <!-- 主体内容 -->
-  <div class="mt-6 space-y-6">
-    <!-- 机器人列表区域 -->
-    <div>
-      <div class="flex items-center justify-between mb-4">
-        <div>
-          <h2 class="text-base font-semibold text-white">🤖 企微机器人矩阵 (多角色隔离)</h2>
-          <p class="text-xs text-slate-400">你可以为不同的企微 Bot 绑定不同 Agent 与提示词，实现分工协作。</p>
-        </div>
-        <button onclick="addNewBot()" class="px-3 py-1 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-sky-400 border border-slate-700 rounded-lg flex items-center gap-1 transition-colors">
-          <span>+</span> 添加新 Bot 角色
-        </button>
-      </div>
-
-      <div id="bots-container" class="space-y-4">
-        <!-- 动态渲染 Bot 卡片 -->
-      </div>
-    </div>
-
-    <!-- 全局与 Magpie 联动设置 -->
-    <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm">
-      <h2 class="text-sm font-semibold text-white mb-3">⚙️ Magpie 嗅探与自动化选项</h2>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-        <label class="flex items-center gap-2 text-slate-300 cursor-pointer">
-          <input type="checkbox" id="auto-sniff-enabled" checked class="rounded text-sky-500 focus:ring-0">
-          <span>开启 Magpie 任务完成自动嗅探与推送到企微</span>
-        </label>
-        <div class="flex items-center gap-2 text-slate-300">
-          <span>嗅探最小耗时阈值:</span>
-          <input type="number" id="auto-sniff-duration" value="3" min="1" max="60" class="w-16 px-2 py-1 text-xs rounded border border-slate-700">
-          <span>秒</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- 底部操作与帮助指引 -->
-    <div class="pt-4 border-t border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-xs text-slate-400">
-      <div class="space-y-1">
-        <p>💡 <b>如何获取 Bot ID 和 Secret？</b></p>
-        <p>在企业微信工作台 $\rightarrow$ 智能机器人 $\rightarrow$ 创建机器人 $\rightarrow$ 选 <b>API 模式</b> 并勾选 <b>使用长连接</b> 即可复制。</p>
-      </div>
-      <div>
-        <button onclick="saveAndApply()" class="px-4 py-2 text-sm font-medium bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg shadow-lg shadow-emerald-950 transition-colors">
-          💾 保存所有修改
-        </button>
-      </div>
+  <div class="card">
+    <h2>Bot 管理</h2>
+    <p class="muted">
+      网关通常由上面的自动启动项拉起；也可以在终端执行：
+      <code id="mg-command">npm start</code>
+    </p>
+    <label class="field">
+      <span>管理服务地址</span>
+      <input id="mg-service-url" type="text" readonly>
+    </label>
+    <div class="row">
+      <button id="mg-open" class="btn btn-primary" type="button">打开管理界面</button>
+      <span class="muted small">若窗口内无法打开，请复制上方地址到浏览器访问。</span>
     </div>
   </div>
 
-  <script>
-    const API_BASE = 'http://127.0.0.1:9099';
-    let currentConfig = { bots: [], autoSniff: { enabled: true, minDurationSec: 3 } };
-    let serviceRunning = true;
+  <div class="card">
+    <h2>凭证获取</h2>
+    <p class="muted">企业微信工作台 → 智能机器人 → 创建 → 选择 “API 模式” → 勾选 “使用长连接” → 复制 Bot ID 与 Secret。</p>
+  </div>
+</section>
 
-    async function loadData() {
-      try {
-        const [statusRes, configRes] = await Promise.all([
-          fetch(`${API_BASE}/api/status`).catch(() => null),
-          fetch(`${API_BASE}/api/config`).catch(() => null)
-        ]);
+<!-- ======================= 本地管理界面模式 ======================= -->
+<section id="standalone-panel" class="panel" hidden>
+  <div id="token-warning" class="notice danger" hidden>
+    本页面没有管理令牌，无法调用接口。请通过
+    <code id="expected-url">http://127.0.0.1:9099/</code> 打开管理界面。
+  </div>
 
-        if (statusRes && statusRes.ok) {
-          const statusData = await statusRes.json();
-          serviceRunning = statusData.running;
-          updateStatusBadge(serviceRunning);
-        } else {
-          updateStatusBadge(false, '未连接 (请确保核心服务已启动)');
-        }
+  <div class="section-head">
+    <div>
+      <h2>机器人列表</h2>
+      <p class="muted">为不同企微 Bot 绑定不同 Agent 与角色人设</p>
+    </div>
+    <button id="btn-add" class="btn" type="button">+ 添加 Bot</button>
+  </div>
+  <div id="bot-list"></div>
 
-        if (configRes && configRes.ok) {
-          currentConfig = await configRes.json();
-          document.getElementById('auto-sniff-enabled').checked = currentConfig.autoSniff?.enabled !== false;
-          document.getElementById('auto-sniff-duration').value = currentConfig.autoSniff?.minDurationSec || 3;
-          renderBots();
-        }
-      } catch (err) {
-        console.warn('加载数据失败:', err);
-      }
-    }
+  <div class="card">
+    <h2>企微通知（Magpie）</h2>
+    <p class="muted small">
+      通知开关、最小耗时、等待确认提醒、通知地址与是否自动启动本地服务由 Magpie 插件选项控制，请在 Magpie 的插件页中修改；
+      本机服务只负责接收 <code>/notify</code> 推送并转发到企微。
+    </p>
+  </div>
 
-    function updateStatusBadge(running, label) {
-      const el = document.getElementById('service-status');
-      const btn = document.getElementById('btn-toggle-service');
-      if (running) {
-        el.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-950 text-emerald-400 border border-emerald-800';
-        el.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>' + (label || '服务运行中');
-        btn.textContent = '停止服务';
-        btn.className = 'px-3 py-1.5 text-xs font-medium bg-rose-600 hover:bg-rose-500 text-white rounded-lg transition-colors shadow';
-      } else {
-        el.className = 'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-950 text-rose-400 border border-rose-800';
-        el.innerHTML = '<span class="w-2 h-2 rounded-full bg-rose-400"></span>' + (label || '服务已停止');
-        btn.textContent = '启动服务';
-        btn.className = 'px-3 py-1.5 text-xs font-medium bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors shadow';
-      }
-    }
+  <div class="footer">
+    <span class="muted small">凭证仅保存在本机 config.json（权限 0600），接口返回时始终脱敏。</span>
+    <button id="btn-save-bottom" class="btn btn-primary" type="button">保存并应用</button>
+  </div>
+</section>
 
-    async function toggleService() {
-      const endpoint = serviceRunning ? '/api/service/stop' : '/api/service/start';
-      try {
-        await fetch(`${API_BASE}${endpoint}`, { method: 'POST' });
-        await loadData();
-      } catch (e) {
-        alert('切换状态失败，请确认本地端口 9099 正常');
-      }
-    }
+<div id="toast" class="toast" role="status" hidden></div>
 
-    function renderBots() {
-      const container = document.getElementById('bots-container');
-      container.innerHTML = '';
-
-      if (!currentConfig.bots || currentConfig.bots.length === 0) {
-        container.innerHTML = `
-          <div class="text-center py-8 border border-dashed border-slate-800 rounded-xl bg-slate-900/50">
-            <p class="text-sm text-slate-400">暂未添加任何企微 Bot</p>
-            <button onclick="addNewBot()" class="mt-2 text-xs text-sky-400 hover:underline">+ 点击添加第一个机器人</button>
-          </div>
-        `;
-        return;
-      }
-
-      currentConfig.bots.forEach((bot, index) => {
-        const card = document.createElement('div');
-        card.className = 'bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm space-y-4';
-        card.innerHTML = `
-          <div class="flex items-center justify-between border-b border-slate-800/80 pb-3">
-            <div class="flex items-center gap-2">
-              <span class="text-lg">🤖</span>
-              <input type="text" value="${escapeHtml(bot.name || 'AI 助手')}" onchange="updateBotField(${index}, 'name', this.value)" class="font-semibold text-sm bg-transparent px-2 py-1 rounded border border-transparent hover:border-slate-700" placeholder="角色名称，如: 架构重构助手">
-            </div>
-            <button onclick="removeBot(${index})" class="text-xs text-rose-400 hover:text-rose-300 px-2 py-1 hover:bg-rose-950/40 rounded transition-colors">
-              删除此 Bot
-            </button>
-          </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-            <div>
-              <label class="block text-slate-400 mb-1">绑定的 Agent 引擎</label>
-              <select onchange="updateBotField(${index}, 'defaultAgent', this.value)" class="w-full px-3 py-2 rounded border border-slate-700">
-                <option value="claude" ${bot.defaultAgent === 'claude' ? 'selected' : ''}>Claude Code (claude -p)</option>
-                <option value="opencode" ${bot.defaultAgent === 'opencode' ? 'selected' : ''}>OpenCode (opencode run)</option>
-                <option value="sh" ${bot.defaultAgent === 'sh' ? 'selected' : ''}>终端 Shell (/sh 直接执行)</option>
-              </select>
-            </div>
-
-            <div>
-              <label class="block text-slate-400 mb-1">授权用户白名单 (逗号分隔，留空不限制)</label>
-              <input type="text" value="${escapeHtml((bot.allowedUsers || []).join(', '))}" onchange="updateBotField(${index}, 'allowedUsers', this.value.split(',').map(s=>s.trim()).filter(Boolean))" class="w-full px-3 py-2 rounded border border-slate-700" placeholder="例如: zhangsan, lisi">
-            </div>
-
-            <div>
-              <label class="block text-slate-400 mb-1">Bot ID (企业微信后台)</label>
-              <input type="text" value="${escapeHtml(bot.botId || '')}" onchange="updateBotField(${index}, 'botId', this.value.trim())" class="w-full px-3 py-2 rounded border border-slate-700 font-mono text-xs" placeholder="例如: bot_xxxxxxxxxxxx">
-            </div>
-
-            <div>
-              <label class="block text-slate-400 mb-1">Secret 密钥</label>
-              <input type="password" value="${escapeHtml(bot.secret || '')}" onchange="updateBotField(${index}, 'secret', this.value.trim())" class="w-full px-3 py-2 rounded border border-slate-700 font-mono text-xs" placeholder="例如: sec_xxxxxxxxxxxx">
-            </div>
-          </div>
-
-          <div>
-            <label class="block text-xs text-slate-400 mb-1">人设提示词前缀 (可选，为该 Bot 注入专属角色设定)</label>
-            <textarea rows="2" onchange="updateBotField(${index}, 'promptPrefix', this.value)" class="w-full px-3 py-2 rounded border border-slate-700 text-xs" placeholder="例如: 你是一名资深 Go 架构师，请严格遵循 SOLID 原则解答并产出代码...">${escapeHtml(bot.promptPrefix || '')}</textarea>
-          </div>
-        `;
-        container.appendChild(card);
-      });
-    }
-
-    function addNewBot() {
-      const id = 'bot-' + Date.now();
-      currentConfig.bots.push({
-        id,
-        name: '新 AI 助手 ' + (currentConfig.bots.length + 1),
-        botId: '',
-        secret: '',
-        defaultAgent: 'claude',
-        allowedUsers: [],
-        promptPrefix: ''
-      });
-      renderBots();
-    }
-
-    function removeBot(index) {
-      if (confirm('确定要删除这个机器人配置吗？')) {
-        currentConfig.bots.splice(index, 1);
-        renderBots();
-      }
-    }
-
-    function updateBotField(index, field, value) {
-      currentConfig.bots[index][field] = value;
-    }
-
-    async function saveAndApply() {
-      currentConfig.autoSniff = {
-        enabled: document.getElementById('auto-sniff-enabled').checked,
-        minDurationSec: Number(document.getElementById('auto-sniff-duration').value) || 3
-      };
-
-      try {
-        const res = await fetch(`${API_BASE}/api/config`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(currentConfig)
-        });
-
-        if (res.ok) {
-          alert('✅ 配置已成功保存！机器人连接已自动热重载。');
-          await loadData();
-        } else {
-          const err = await res.json();
-          alert('保存失败: ' + err.error);
-        }
-      } catch (e) {
-        alert('无法连接本地网关接口 (http://127.0.0.1:9099)，请确认核心服务已启动。');
-      }
-    }
-
-    function escapeHtml(str) {
-      return String(str || '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-    }
-
-    // 初始化加载
-    loadData();
-    setInterval(loadData, 5000);
-  </script>
+<script src="_magpie/bridge.js"></script>
+<script src="app.js"></script>
 </body>
 </html>

@@ -4,13 +4,15 @@ import http from 'node:http';
  * 轻量标准 MCP (Model Context Protocol) 服务端实现 (基于 stdio)
  * 让 Claude Code / Antigravity / Cursor 可以直接作为 MCP Tool 挂载使用：
  * 工具名: `wecom_send_notification`
+ *
+ * 运行: `wecom-bridge mcp --port 9099`
  */
 export function startMcpServer(notifyPort = 9099) {
   process.stdin.setEncoding('utf-8');
 
   let buffer = '';
 
-  process.stdin.on('data', async (chunk) => {
+  process.stdin.on('data', async (chunk: string) => {
     buffer += chunk;
     const lines = buffer.split('\n');
     buffer = lines.pop() || '';
@@ -20,11 +22,13 @@ export function startMcpServer(notifyPort = 9099) {
       try {
         const req = JSON.parse(line);
         await handleMcpRequest(req, notifyPort);
-      } catch (e) {
+      } catch {
         // 忽略非 JSON 行
       }
     }
   });
+
+  console.error(`[MCP] wecom-agent-bridge MCP Server 已启动 (转发到 127.0.0.1:${notifyPort})`);
 }
 
 async function handleMcpRequest(req: any, notifyPort: number) {
@@ -32,27 +36,37 @@ async function handleMcpRequest(req: any, notifyPort: number) {
 
   // 1. 初始化能力协商
   if (method === 'initialize') {
-    const res = {
+    sendJson({
       jsonrpc: '2.0',
       id,
       result: {
-        protocolVersion: '2024-11-05',
+        protocolVersion: params?.protocolVersion || '2024-11-05',
         capabilities: {
           tools: {},
         },
         serverInfo: {
           name: 'wecom-agent-bridge-mcp',
-          version: '1.0.0',
+          version: '1.1.1',
         },
       },
-    };
-    sendJson(res);
+    });
+    return;
+  }
+
+  // 初始化完成通知：JSON-RPC notification，无需响应
+  if (method === 'notifications/initialized' || method === 'notifications/cancelled') {
+    return;
+  }
+
+  // MCP keepalive
+  if (method === 'ping') {
+    sendJson({ jsonrpc: '2.0', id, result: {} });
     return;
   }
 
   // 2. 列出提供的工具
   if (method === 'tools/list') {
-    const res = {
+    sendJson({
       jsonrpc: '2.0',
       id,
       result: {
@@ -77,44 +91,61 @@ async function handleMcpRequest(req: any, notifyPort: number) {
           },
         ],
       },
-    };
-    sendJson(res);
+    });
     return;
   }
 
   // 3. 执行工具调用
   if (method === 'tools/call') {
     const { name, arguments: args } = params || {};
-    if (name === 'wecom_send_notification') {
-      const content = args?.content || '';
-      const title = args?.title;
+    if (name !== 'wecom_send_notification') {
+      sendJson({
+        jsonrpc: '2.0',
+        id,
+        error: { code: -32601, message: `未知工具: ${name}` },
+      });
+      return;
+    }
 
-      const ok = await forwardToLocalNotify(content, title, notifyPort);
-
+    const content = String(args?.content || '');
+    const title = args?.title ? String(args.title) : undefined;
+    if (!content.trim()) {
       sendJson({
         jsonrpc: '2.0',
         id,
         result: {
-          content: [
-            {
-              type: 'text',
-              text: ok
-                ? '✅ 消息已成功推送到用户的手机企业微信！'
-                : '⚠️ 推送失败，请确认 wecom-agent-bridge 网关服务是否在本地运行。',
-            },
-          ],
+          isError: true,
+          content: [{ type: 'text', text: '⚠️ content 不能为空。' }],
         },
       });
       return;
     }
+
+    const ok = await forwardToLocalNotify(content, title, notifyPort);
+    sendJson({
+      jsonrpc: '2.0',
+      id,
+      result: {
+        isError: !ok,
+        content: [
+          {
+            type: 'text',
+            text: ok
+              ? '✅ 消息已成功推送到用户的手机企业微信！'
+              : '⚠️ 推送失败，请确认 wecom-agent-bridge 网关服务是否在本地运行。',
+          },
+        ],
+      },
+    });
+    return;
   }
 
-  // 默认空响应或不支持的方法
+  // 4. 未知方法
   if (id !== undefined) {
     sendJson({
       jsonrpc: '2.0',
       id,
-      result: {},
+      error: { code: -32601, message: `未知方法: ${method}` },
     });
   }
 }
@@ -126,6 +157,15 @@ function sendJson(obj: any) {
 function forwardToLocalNotify(content: string, title?: string, port = 9099): Promise<boolean> {
   return new Promise((resolve) => {
     const payload = JSON.stringify({ content, title });
+    let settled = false;
+    let timer: NodeJS.Timeout | undefined;
+    const finish = (ok: boolean) => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      resolve(ok);
+    };
+
     const req = http.request(
       {
         hostname: '127.0.0.1',
@@ -138,11 +178,20 @@ function forwardToLocalNotify(content: string, title?: string, port = 9099): Pro
         },
       },
       (res) => {
-        resolve(res.statusCode === 200);
+        res.resume();
+        finish(res.statusCode === 200);
       }
     );
 
-    req.on('error', () => resolve(false));
+    // A gateway that accepts the socket but never answers must not hang the
+    // MCP client's tool call forever.
+    timer = setTimeout(() => {
+      req.destroy();
+      finish(false);
+    }, 5000);
+    timer.unref?.();
+
+    req.on('error', () => finish(false));
     req.write(payload);
     req.end();
   });

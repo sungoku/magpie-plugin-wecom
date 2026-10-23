@@ -4,9 +4,19 @@ config.local.json
 .env
 .env.*
 
+# Build output (run `npm run build`)
+packages/core/dist/
+
 # Logs
 *.log
 Library/Logs/
+
+# Editor artifacts
+*.swp
+*.swo
+
+# Claude Code local settings (may contain local paths/usernames)
+.claude/settings.local.json
 
 # Dependencies
 node_modules/

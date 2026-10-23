@@ -1,12 +1,4 @@
 {
-  "wecom": {
-    "botId": "YOUR_BOT_ID_HERE",
-    "secret": "YOUR_SECRET_HERE",
-    "allowedUsers": [
-      "User1",
-      "User2"
-    ]
-  },
   "server": {
     "port": 9099,
     "host": "127.0.0.1"
@@ -16,17 +8,31 @@
     "claude": {
       "type": "cli",
       "command": "claude -p \"{prompt}\"",
-      "description": "Claude Code 终端交互"
+      "description": "Claude Code 终端交互",
+      "timeoutSec": 900
     },
     "opencode": {
       "type": "cli",
       "command": "opencode run \"{prompt}\"",
-      "description": "OpenCode 终端交互"
+      "description": "OpenCode 终端交互",
+      "timeoutSec": 900
     },
     "sh": {
       "type": "cli",
       "command": "{prompt}",
-      "description": "直接执行终端 Shell 命令"
+      "description": "直接执行终端 Shell 命令（务必设置白名单）",
+      "timeoutSec": 300
     }
-  }
+  },
+  "bots": [
+    {
+      "id": "bot-1",
+      "name": "架构重构助手",
+      "botId": "YOUR_BOT_ID_HERE",
+      "secret": "YOUR_SECRET_HERE",
+      "defaultAgent": "claude",
+      "allowedUsers": ["User1", "User2"],
+      "promptPrefix": "你是资深架构师，回答简洁，先给结论再给理由。"
+    }
+  ]
 }

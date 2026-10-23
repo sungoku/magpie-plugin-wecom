@@ -1,15 +1,20 @@
 {
   "name": "@magpie-community/plugin-wecom",
-  "version": "1.1.0",
-  "description": "Enterprise WeChat (WeCom) Multi-Bot Manager & Task Sniffer Plugin for Magpie",
+  "version": "1.1.1",
+  "description": "Enterprise WeChat (WeCom) Multi-Bot Manager & Task Completion Notifier for Magpie",
   "type": "module",
+  "main": "./wecom.plugin.js",
   "magpie": {
     "page": {
       "title": "企微 AI 伴侣",
+      "titles": {
+        "zh-TW": "企微 AI 伴侶",
+        "en": "WeCom AI Companion"
+      },
       "file": "./page/index.html",
-      "icon": "message-square"
+      "icon": "page/icon.svg"
     },
-    "middleware": "./wecom.middleware.js",
+    "hooks": "./wecom.hooks.js",
     "options": {
       "notifyUrl": {
         "type": "string",
@@ -19,19 +24,34 @@
       "enabled": {
         "type": "boolean",
         "default": true,
-        "description": "是否启用企微自动任务完成通知"
+        "description": "是否启用企微通知（任务完成与等待确认/选择）"
       },
       "minDurationSec": {
         "type": "number",
         "default": 3,
-        "description": "触发通知的最小任务耗时(秒)，过滤极短轻量请求"
+        "description": "整个轮次的最小触发耗时（秒），跨工具调用/侧调用累计，用于过滤极短轻量请求"
+      },
+      "approvalWaitSec": {
+        "type": "number",
+        "default": 10,
+        "description": "客户端工具调用后超过该秒数仍无下一步请求时，推送“可能在等待确认/选择”提醒；0 关闭"
+      },
+      "gatewayTimeoutMs": {
+        "type": "number",
+        "default": 3000,
+        "description": "通知 hook 允许的最长等待时间(毫秒)"
+      },
+      "autoStartService": {
+        "type": "boolean",
+        "default": false,
+        "description": "本地网关未运行时，由 Magpie 插件宿主自动启动（需本仓库已安装依赖，建议先 npm run build）"
       }
     }
   },
   "keywords": [
     "magpie",
     "page",
-    "middleware",
+    "hooks",
     "wecom",
     "multi-bot",
     "ai-agent",
